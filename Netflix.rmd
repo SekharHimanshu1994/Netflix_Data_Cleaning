@@ -1,0 +1,294 @@
+---
+title: "Netflix_Cleaning"
+author: "Himanshu"
+date: "2023-02-23"
+output: html_document
+---
+**Project Overview**
+
+The aim of this portfolio project was to analyze and present insights on a data set containing movie details from 2015 to 2021. The initial data set required cleaning before any meaningful conclusions could be drawn from it.
+
+To clean the data, various processes were employed. Additionally, instead of using the ggplot2 package, Tableau was used to showcase some of the Tableau skills.
+
+The final result of this project is a thorough analysis and presentation of insights from the cleaned data set, demonstrating the proficiency in data cleaning, data analysis, and data visualization using Tableau.
+
+**Project Problems**
+
+This portfolio project aimed to answer several questions related to a data set containing movie details from 2015 to 2021. These questions include:
+
+1. Is the number of genres related to getting a high IMDB score or being nominated for awards?
+2. Is the number of languages related to getting a high IMDB score or being nominated for awards?
+3. Is the number of countries a movie is released in related to getting a high IMDB score or being nominated for awards?
+4. What are the trends in the number of movies released per month and per year (excluding the year 2015)?
+
+The goal of this project was to use data cleaning, analysis, and visualization techniques to answer these questions and provide valuable insights into the movie industry and Netflix users.
+
+**Cleaning the Data Processes**
+
+**Step-1**
+
+**Package Installation**
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(dplyr)
+library(readr)
+library(stringr)
+```
+**Step-2**
+
+**Loading the Data into R**
+```{r message=FALSE, warning=FALSE}
+netflix_raw_file <- read_csv("C:/Users/himan/Desktop/Portofolio/Netflix Project/23-02-2023/netflix_raw_file.csv")
+```
+**Data Types**
+```{r}
+glimpse(netflix_raw_file)
+```
+**Step-3**
+
+**Trimming & Naming Conventions** (Using of ***clean_name ()*** function)
+```{r message=FALSE, warning=FALSE}
+netflix_raw_file_trimmed <- netflix_raw_file %>% 
+                            mutate_all(str_trim)
+library(janitor)
+netflix_column_name_changed <- netflix_raw_file_trimmed %>% 
+                               clean_names()
+netflix_column_name_changed <- netflix_column_name_changed %>% 
+  rename(series_movie = series_or_movie, imdb_link = im_db_link, 
+         imdb_score = im_db_score, imdb_votes = im_db_votes, 
+         tmdb_trailer = tm_db_trailer)
+colnames(netflix_column_name_changed)
+```
+**Step-4**
+
+**Duplicate Removing**
+```{r}
+(no_of_rows <- nrow(netflix_column_name_changed))
+duplicate_rows <- netflix_column_name_changed %>% 
+  duplicated.data.frame()
+netflix_unique_rows <- netflix_column_name_changed %>%
+  distinct(title, .keep_all = TRUE)
+(no_of_rows <- nrow(netflix_unique_rows))
+##There are 409 titles which are duplicate and removed from the data.
+```
+**Step-5**
+
+**Converting to same unit** (Using of ***case_when()*** funtion)
+```{r}
+netflix_runtime_changed <- netflix_unique_rows %>% 
+  mutate(runtime = case_when(runtime == '1-2 hour' ~ '60-120 minutes', 
+                             runtime == '> 2 hour' ~ '> 120 minutes',
+                             runtime == '< 30 minutes' ~ '< 30 minutes',
+                             runtime == '30-60 minutes' ~ '30-60 minutes',
+                             runtime == NA ~ 'Unknown'))
+```
+**Step-6**
+
+**Filling in Missing Data for Genre Column**
+
+The "genre" column had 1706 missing or "NA" values, which needed to be addressed. To fill in the missing data, I decided to use the information available in the "Tags" column.
+```{r}
+genre_NA <- netflix_runtime_changed %>% 
+  filter(is.na(genre))
+nrow(genre_NA)
+```
+**Step-6.1**
+
+Need to create a list of unique genres to help fill in missing data in the "genre" column.
+```{r warning=FALSE}
+#Selecting only genre column without Null value
+genre_not_NA <- netflix_runtime_changed %>% 
+  filter(!is.na(genre)) %>% 
+  select(genre)
+#Separating all the genres in the data set using a delimiter (",")
+separate_genre <- str_split_fixed(genre_not_NA$genre, ",",15)
+separate_genre_1 <- genre_not_NA %>% 
+  separate(genre,into = paste0("col",1:12),sep= ",")
+#Unioning all the separated genres into a single list
+union_genre <- data.frame(x=unlist(separate_genre_1))
+nrow(union_genre)
+#Filtering out duplicate values to create a list of distinct genres
+unique_genre <- union_genre %>% distinct()
+nrow(unique_genre)
+#Trimming for extra space
+unique_genre$x <- gsub(" ", "", unique_genre$x)
+unique_genre <- union_genre %>% distinct()
+nrow(unique_genre)
+# While the initial count suggested that there were 56 unique genres, further investigation revealed that there were only 28 unique genres present.To address this issue, i decided to remove all duplicate values and NA values through Excel. By cleaning up the data in this way ensuring that the data set was complete, accurate, and free from any errors that might have compromised the analysis. This note serves as a reminder of the importance of quality control and error checking throughout the data cleaning process.
+#To save the data in excel file
+library(openxlsx)
+write.xlsx(unique_genre,"unique_genre.xlsx", row.namees = FALSE )
+# Now reloading the updated unique_genre file
+updated_unique_genre <- read.xlsx("unique_genre_1.xlsx")
+nrow(updated_unique_genre)
+```
+**Step-5.2**
+
+28 unique genres identified present in the data set. Similarly, we will also determine the unique tags in the "tags" column.
+```{r}
+# Identifying 12 number of rows in the data set that do not have any genre or tags information.
+genre_tags_NA <- netflix_runtime_changed %>% 
+  filter(is.na(tags)) %>% 
+  filter(is.na(genre))
+nrow(genre_tags_NA)
+# Identifying 66 number of rows in the data set that do not have any tags information.
+tags_NA <- netflix_runtime_changed %>% 
+  filter(is.na(tags))
+nrow(tags_NA)
+```
+We have identified that there are 44 rows in the data set that have genre information but no tags information, and 12 rows that have no genre or tags information.
+```{r warning=FALSE}
+#Selecting only tags column without Null value
+tags_not_NA <- netflix_runtime_changed %>% 
+  filter(!is.na(tags)) %>% 
+  filter(!is.na(genre)) %>% 
+  select(tags)
+nrow(tags_not_NA)
+#Separating all the tags in the data set using a delimiter (",")
+separate_tags <- str_split_fixed(tags_not_NA$tags,",",33)
+separate_tags_1 <- tags_not_NA %>% 
+  separate(tags,into = paste0("col_",1:33),",")
+nrow(separate_tags_1)
+#Unioning all the separated tags into a single list
+union_tags <- data.frame(x=unlist(separate_tags_1))
+nrow(union_tags)
+#Trimming for extra space
+unique_tags_1 <- union_tags %>% 
+  mutate_all(str_trim)
+#Filtering out duplicate values to create a list of distinct tags
+unique_tags_2 <- unique_tags_1 %>% 
+  distinct(x)
+nrow(unique_tags_2)
+# While the initial count suggested that there were 1000 unique genres, further investigation revealed that there were only 985 unique genres present.To address this issue, i decided to remove all duplicate values and NA values through Excel. By cleaning up the data in this way ensuring that the data set was complete, accurate, and free from any errors that might have compromised the analysis. This note serves as a reminder of the importance of quality control and error checking throughout the data cleaning process.
+write.xlsx(unique_tags_2,"unique_tags_2.xlsx", rowNames = FALSE)
+# Now reinserting the updated unique_genre file.
+updated_unique_tag <- read.xlsx("unique_tags_2_Cleaned.xlsx")
+nrow(updated_unique_tag)
+```
+**Step-5.3**
+
+There are 985 unique tags present in our data set.
+The next step involved matching each tag with 28 unique genres created earlier to help with this process.
+```{r warning=FALSE}
+# It is identified that some tags in the data set had more than one genre listed in each cell.First separate the tags column with a space delimiter.
+updated_unique_tag$tags_split <- strsplit(as.character(updated_unique_tag$tags), " ")
+#Creating a function to match the first four letter of genre and first four letter of tags and if matched then give the genre name.And if more than one genre then add with comma delimiter.
+updated_unique_tag$genres <- lapply(updated_unique_tag$tags_split, function(x) {
+  matching_genre <- ""
+  for (word in x) {
+    if (substr(word, 1, 4) %in% substr(updated_unique_genre$genre, 1, 4)) {
+      matching_genre <- paste(matching_genre, updated_unique_genre$genre[substr(updated_unique_genre$genre, 1, 4) == substr(word, 1, 4)], sep = ",")
+    }
+  }
+  matching_genre
+})
+nrow(updated_unique_tag)
+write.xlsx(updated_unique_tag, "updated_unique_tag.xlsx")
+#Now i have removed commas and modify this on excel as it is easy to do in excel as this have only small data set.
+tags_genre_list <- read.xlsx("updated_unique_tag__genre_cleaned.xlsx")
+nrow(tags_genre_list)
+view(tags_genre_list)
+# Identifying the number of rows which have no genre in this tags list.
+tags_have_no_genre <- tags_genre_list %>% 
+  filter(is.na(genre))
+nrow(tags_have_no_genre)
+#There are 219 tags have no genres.
+```
+**Step-5.4** (Use of ***left_join()***, ***row_number()*** functions)
+
+We will match the tags in tags column and put genre in them.
+```{r warning=FALSE}
+# Separating the words in 'genre_NA_Tags_not_NA' and pivoting.
+genre_NA_Tags_not_NA <- genre_NA %>% 
+  select(title, genre, tags)
+df_sep <- genre_NA_Tags_not_NA %>%
+  mutate(row_num = row_number()) %>%
+  separate_rows(tags, sep = ",")
+nrow(df_sep)
+View(df_sep)
+View(genre_NA_Tags_not_NA)
+# join df_sep with tags_genre_list based on matching words in tags column using join function
+df_join <- df_sep %>%
+  left_join(tags_genre_list, by = c("tags" = "tags"))
+nrow(df_join)
+# group the data by the original row numbers in genre_NA_Tags_not_NA and concatenate the values in genre.y column without adding null values.
+df_result <- df_join %>%
+  group_by(row_num) %>%
+  summarise(col2 = paste(na.omit(genre.y), collapse = ",")) %>%
+  ungroup() %>%
+  select(-row_num)
+nrow(df_result)
+# Merging the result with the original 'genre_NA_Tags_not_NA'
+updated_genre_NA_Tags_not_NA <- cbind(genre_NA_Tags_not_NA, df_result)
+#Selecting all the rows which have no genre information with "Unknown".
+updated_genre_NA_Tags_not_NA$col2[updated_genre_NA_Tags_not_NA$col2 == ""] <- "Unknown"
+updated_genre_NA_Tags_not_NA <- updated_genre_NA_Tags_not_NA %>% 
+  select(col2, title, genre,tags)
+# Define a function to remove duplicates from each cell
+remove_duplicates <- function(x) {
+  if (is.na(x) || x == "") {
+    # Return an empty string for NA or empty cells
+    return("")
+  } else {
+    # Split the cell by comma
+    split_cell <- strsplit(x, ",")[[1]]
+    # Remove duplicates and return the modified cell
+    return(paste0(unique(split_cell), collapse = ","))
+  }
+}
+# Applying the remove_duplicates function to each cell. 
+updated_genre_NA_Tags_not_NA$new_genre <- apply(updated_genre_NA_Tags_not_NA, 1, remove_duplicates)
+
+# Converting each row to a string and wrap with parentheses
+updated_genre_NA_Tags_not_NA$new_genre <- paste0(updated_genre_NA_Tags_not_NA$new_genre)
+
+# Removing row names
+rownames(updated_genre_NA_Tags_not_NA) <- NULL
+update_genre_tags <-  updated_genre_NA_Tags_not_NA %>% 
+  select(title, new_genre,tags)
+# Combining this data with main file before assigning genre file data using left join.
+new_file <- netflix_runtime_changed %>% 
+  left_join(update_genre_tags, by = c("title" = "title"))
+# Assigning the missing genres for the 1706 rows.
+new_file$genre[is.na(new_file$genre)] <- new_file$new_genre[is.na(new_file$genre)]
+# Removing unnecessary columns
+new_file <- new_file %>% 
+  select(-tags.y, -new_genre)
+# Saving the file
+write.csv(new_file, "new_file.csv")
+# Now we got all the genre column filled up.
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
